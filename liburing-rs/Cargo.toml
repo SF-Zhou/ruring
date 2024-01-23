@@ -1,0 +1,13 @@
+[package]
+name = "liburing-rs"
+version = "0.1.0"
+edition = "2021"
+description = "Rust version of liburing implementation."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+documentation = "https://github.com/SF-Zhou/ruring"
+homepage = "https://github.com/SF-Zhou/ruring"
+repository = "https://github.com/SF-Zhou/ruring"
+
+[dependencies]
+libc.workspace = true
