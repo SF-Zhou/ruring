@@ -193,48 +193,6 @@ pub const SOCKET_URING_OP_GETSOCKOPT: u32 = 2;
 pub const SOCKET_URING_OP_SETSOCKOPT: u32 = 3;
 
 #[repr(C)]
-pub struct __BindgenUnionField<T>(::std::marker::PhantomData<T>);
-impl<T> ::std::default::Default for __BindgenUnionField<T> {
-    #[inline]
-    fn default() -> Self {
-        Self(::std::marker::PhantomData)
-    }
-}
-impl<T> ::std::clone::Clone for __BindgenUnionField<T> {
-    #[inline]
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-impl<T> ::std::marker::Copy for __BindgenUnionField<T> {}
-impl<T> ::std::fmt::Debug for __BindgenUnionField<T> {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("__BindgenUnionField")
-    }
-}
-impl<T> ::std::hash::Hash for __BindgenUnionField<T> {
-    fn hash<H: ::std::hash::Hasher>(&self, _state: &mut H) {}
-}
-impl<T> ::std::cmp::PartialEq for __BindgenUnionField<T> {
-    fn eq(&self, _other: &__BindgenUnionField<T>) -> bool {
-        true
-    }
-}
-impl<T> ::std::cmp::Eq for __BindgenUnionField<T> {}
-impl<T> ::std::convert::AsRef<T> for __BindgenUnionField<T> {
-    #[inline]
-    fn as_ref(&self) -> &T {
-        unsafe { ::std::mem::transmute(self) }
-    }
-}
-impl<T> ::std::convert::AsMut<T> for __BindgenUnionField<T> {
-    #[inline]
-    fn as_mut(&mut self) -> &mut T {
-        unsafe { ::std::mem::transmute(self) }
-    }
-}
-
-#[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
 pub struct KernelTimespec {
     pub tv_sec: ::std::os::raw::c_longlong,
@@ -399,11 +357,10 @@ pub struct IoUringSqeUnion5AddrLen {
 }
 
 #[repr(C)]
-pub struct IoUringSqeUnion6 {
-    pub addr3: __BindgenUnionField<IoUringSqeUnion6Addr3>,
-    pub optval: __BindgenUnionField<::std::os::raw::c_ulonglong>,
-    pub cmd: __BindgenUnionField<[::std::os::raw::c_uchar; 0usize]>,
-    pub bindgen_union_field: [u64; 2usize],
+pub union IoUringSqeUnion6 {
+    pub addr3: IoUringSqeUnion6Addr3,
+    pub optval: ::std::os::raw::c_ulonglong,
+    pub cmd: [::std::os::raw::c_uchar; 16usize],
 }
 
 impl Default for IoUringSqeUnion6 {
@@ -562,28 +519,12 @@ pub struct IoUringBuf {
     pub addr: ::std::os::raw::c_ulonglong,
     pub len: ::std::os::raw::c_uint,
     pub bid: ::std::os::raw::c_ushort,
-    pub resv: ::std::os::raw::c_ushort,
+    pub tail: ::std::os::raw::c_ushort,
 }
 
 #[repr(C)]
 pub struct IoUringBufRing {
-    pub union1: IoUringBufRingUnion1,
-}
-
-#[repr(C)]
-pub struct IoUringBufRingUnion1 {
-    pub union1: __BindgenUnionField<IoUringBufRingUnion1Union1>,
-    pub bufs: __BindgenUnionField<[IoUringBuf; 0usize]>,
-    pub bindgen_union_field: [u64; 2usize],
-}
-
-#[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
-pub struct IoUringBufRingUnion1Union1 {
-    pub resv1: ::std::os::raw::c_ulonglong,
-    pub resv2: ::std::os::raw::c_uint,
-    pub resv3: ::std::os::raw::c_ushort,
-    pub tail: ::std::os::raw::c_ushort,
+    pub bufs: [IoUringBuf; 1usize],
 }
 
 #[repr(C)]
