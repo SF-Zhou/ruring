@@ -1,4 +1,4 @@
-use crate::io_uring::*;
+use crate::kernel::IoUringParams;
 use libc::{c_long, c_uint, c_void, sigset_t, syscall};
 use std::fs::File;
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
@@ -78,7 +78,7 @@ pub fn io_uring_register(
 mod tests {
     #[test]
     fn io_uring_setup() {
-        use crate::io_uring::*;
+        use crate::kernel::*;
         use std::io::Read;
 
         let mut params = super::IoUringParams::default();
@@ -125,7 +125,7 @@ mod tests {
 
     #[test]
     fn io_uring_register_probe() {
-        use crate::io_uring::*;
+        use crate::kernel::*;
         use std::process::Command;
 
         fn get_linux_kernel_version() -> Option<String> {
@@ -147,7 +147,7 @@ mod tests {
         assert!(result.is_ok());
         let fd = result.unwrap();
 
-        let probe: Box<super::IoUringProbe> = Box::default();
+        let probe: Box<crate::kernel::IoUringProbe> = Box::default();
         let ptr = Box::into_raw(probe);
         let result = super::io_uring_register(
             &fd,
@@ -159,7 +159,7 @@ mod tests {
         assert!(result.is_ok());
 
         let supported_op_cnt = (1..IORING_OP_LAST)
-            .map(|op| (probe.ops[op as usize].flags as u32 & IO_URING_OP_SUPPORTED != 0) as u32)
+            .map(|op| (probe.ops[op as usize].flags & IO_URING_OP_SUPPORTED != 0) as u32)
             .sum::<u32>();
         println!("supported op cnt: {supported_op_cnt}");
         assert_ne!(supported_op_cnt, 0);
