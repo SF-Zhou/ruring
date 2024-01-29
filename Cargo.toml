@@ -12,6 +12,9 @@ repository = "https://github.com/SF-Zhou/ruring"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+atomic = "0"
+bytemuck = "1"
+bitflags = "2"
 libc = "0"
 
 [profile.release]

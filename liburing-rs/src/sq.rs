@@ -1,5 +1,6 @@
-use crate::{kernel, mmap};
+use crate::{flags::*, kernel, mmap};
 use std::fs::File;
+use std::os::fd::AsRawFd;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -8,25 +9,31 @@ pub struct SubmitQueue {
     pub sqes: mmap::Buffer<kernel::IoUringSqe>,
     pub khead: &'static mut AtomicU32,
     pub ktail: &'static mut AtomicU32,
-    pub kflags: &'static mut AtomicU32,
+    pub kflags: &'static mut atomic::Atomic<SQFlags>,
     pub kdropped: &'static mut AtomicU32,
     pub array: &'static mut [AtomicU32],
-    pub flags: u32,
+    pub flags: SetupFlags,
     pub sqe_head: u32,
     pub sqe_tail: u32,
     pub ring_mask: u32,
     pub ring_entries: u32,
 }
 
+impl ::std::fmt::Debug for SubmitQueue {
+    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        fmt.write_str("SubmitQueue")
+    }
+}
+
 impl SubmitQueue {
     pub fn new(fd: &File, p: &kernel::IoUringParams) -> std::io::Result<Self> {
-        if p.flags & kernel::IORING_SETUP_SQE128 != 0 {
+        if p.flags.contains(SetupFlags::SQE128) {
             unimplemented!("IORING_SETUP_SQE128");
         }
 
         const U32_SZ: usize = std::mem::size_of::<u32>();
         let mut sq_ring_sz = p.sq_off.array as usize + p.sq_entries as usize * U32_SZ;
-        if p.features & kernel::IORING_FEAT_SINGLE_MMAP != 0 {
+        if p.features.contains(FeatureFlags::SINGLE_MMAP) {
             const CQE_SZ: usize = std::mem::size_of::<kernel::IoUringCqe>();
             let cq_ring_sz = p.cq_off.cqes as usize + p.cq_entries as usize * CQE_SZ;
             if cq_ring_sz > sq_ring_sz {
@@ -62,7 +69,7 @@ impl SubmitQueue {
     pub(crate) fn get_sqe(&mut self) -> std::io::Result<&mut kernel::IoUringSqe> {
         let next = self.sqe_tail + 1;
 
-        let head = if self.flags & kernel::IORING_SETUP_SQPOLL != 0 {
+        let head = if self.flags.contains(SetupFlags::SQPOLL) {
             self.khead.load(Ordering::Relaxed)
         } else {
             self.khead.load(Ordering::Acquire)
@@ -91,13 +98,59 @@ impl SubmitQueue {
         Ok(())
     }
 
+    #[inline]
+    fn prep_rw(
+        opcode: u8,
+        sqe: &mut kernel::IoUringSqe,
+        file: &File,
+        offset: u64,
+        buf: &mut [u8],
+        user_data: u64,
+    ) {
+        *sqe = kernel::IoUringSqe {
+            opcode,
+            fd: file.as_raw_fd(),
+            union1: kernel::IoUringSqeUnion1 { off: offset },
+            union2: kernel::IoUringSqeUnion2 {
+                addr: buf.as_mut_ptr() as u64,
+            },
+            len: buf.len() as u32,
+            user_data,
+            ..Default::default()
+        }
+    }
+
+    pub fn prep_read(
+        &mut self,
+        file: &File,
+        offset: u64,
+        buf: &mut [u8],
+        user_data: u64,
+    ) -> std::io::Result<()> {
+        let sqe = self.get_sqe()?;
+        Self::prep_rw(kernel::IORING_OP_READ, sqe, file, offset, buf, user_data);
+        Ok(())
+    }
+
+    pub fn prep_write(
+        &mut self,
+        file: &File,
+        offset: u64,
+        buf: &mut [u8],
+        user_data: u64,
+    ) -> std::io::Result<()> {
+        let sqe = self.get_sqe()?;
+        Self::prep_rw(kernel::IORING_OP_WRITE, sqe, file, offset, buf, user_data);
+        Ok(())
+    }
+
     pub fn flush(&mut self) -> u32 {
         let tail = self.sqe_tail;
 
         if self.sqe_head != tail {
             self.sqe_head = tail;
 
-            if self.flags & kernel::IORING_SETUP_SQPOLL != 0 {
+            if self.flags.contains(SetupFlags::SQPOLL) {
                 self.ktail.store(tail, Ordering::Relaxed);
             } else {
                 self.ktail.store(tail, Ordering::Release);
@@ -108,19 +161,23 @@ impl SubmitQueue {
     }
 
     #[inline]
-    pub(crate) fn needs_enter(&self, submitted: u32, flags: &mut u32) -> bool {
+    pub(crate) fn needs_enter(&self, submitted: u32, flags: &mut EnterFlags) -> bool {
         if submitted == 0 {
             return false;
         }
 
-        if self.flags & kernel::IORING_SETUP_SQPOLL == 0 {
+        if !self.flags.contains(SetupFlags::SQPOLL) {
             return true;
         }
 
         std::sync::atomic::fence(Ordering::SeqCst);
 
-        if self.kflags.load(Ordering::Relaxed) & kernel::IORING_SQ_NEED_WAKEUP != 0 {
-            *flags |= kernel::IORING_ENTER_SQ_WAKEUP;
+        if self
+            .kflags
+            .load(Ordering::Relaxed)
+            .contains(SQFlags::NEED_WAKEUP)
+        {
+            flags.insert(EnterFlags::SQ_WAKEUP);
             true
         } else {
             false

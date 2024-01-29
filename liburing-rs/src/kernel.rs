@@ -2,24 +2,9 @@
 /* C header file: https://github.com/axboe/liburing/blob/liburing-2.5/src/include/liburing/io_uring.h */
 /* bindgen io_uring.h --no-layout-tests --no-prepend-enum-name --translate-enum-integer-types */
 
+use crate::flags::*;
+
 pub const IORING_FILE_INDEX_ALLOC: i32 = -1;
-pub const IORING_SETUP_IOPOLL: u32 = 1;
-pub const IORING_SETUP_SQPOLL: u32 = 2;
-pub const IORING_SETUP_SQ_AFF: u32 = 4;
-pub const IORING_SETUP_CQSIZE: u32 = 8;
-pub const IORING_SETUP_CLAMP: u32 = 16;
-pub const IORING_SETUP_ATTACH_WQ: u32 = 32;
-pub const IORING_SETUP_R_DISABLED: u32 = 64;
-pub const IORING_SETUP_SUBMIT_ALL: u32 = 128;
-pub const IORING_SETUP_COOP_TASKRUN: u32 = 256;
-pub const IORING_SETUP_TASKRUN_FLAG: u32 = 512;
-pub const IORING_SETUP_SQE128: u32 = 1024;
-pub const IORING_SETUP_CQE32: u32 = 2048;
-pub const IORING_SETUP_SINGLE_ISSUER: u32 = 4096;
-pub const IORING_SETUP_DEFER_TASKRUN: u32 = 8192;
-pub const IORING_SETUP_NO_MMAP: u32 = 16384;
-pub const IORING_SETUP_REGISTERED_FD_ONLY: u32 = 32768;
-pub const IORING_SETUP_NO_SQARRAY: u32 = 65536;
 pub const IORING_URING_CMD_FIXED: u32 = 1;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
 pub const IORING_TIMEOUT_ABS: u32 = 1;
@@ -59,29 +44,6 @@ pub const IORING_OFF_SQES: i64 = 268435456;
 pub const IORING_OFF_PBUF_RING: i64 = 2147483648;
 pub const IORING_OFF_PBUF_SHIFT: i64 = 16;
 pub const IORING_OFF_MMAP_MASK: i64 = 4160749568;
-pub const IORING_SQ_NEED_WAKEUP: u32 = 1;
-pub const IORING_SQ_CQ_OVERFLOW: u32 = 2;
-pub const IORING_SQ_TASKRUN: u32 = 4;
-pub const IORING_CQ_EVENTFD_DISABLED: u32 = 1;
-pub const IORING_ENTER_GETEVENTS: u32 = 1;
-pub const IORING_ENTER_SQ_WAKEUP: u32 = 2;
-pub const IORING_ENTER_SQ_WAIT: u32 = 4;
-pub const IORING_ENTER_EXT_ARG: u32 = 8;
-pub const IORING_ENTER_REGISTERED_RING: u32 = 16;
-pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
-pub const IORING_FEAT_NODROP: u32 = 2;
-pub const IORING_FEAT_SUBMIT_STABLE: u32 = 4;
-pub const IORING_FEAT_RW_CUR_POS: u32 = 8;
-pub const IORING_FEAT_CUR_PERSONALITY: u32 = 16;
-pub const IORING_FEAT_FAST_POLL: u32 = 32;
-pub const IORING_FEAT_POLL_32BITS: u32 = 64;
-pub const IORING_FEAT_SQPOLL_NONFIXED: u32 = 128;
-pub const IORING_FEAT_EXT_ARG: u32 = 256;
-pub const IORING_FEAT_NATIVE_WORKERS: u32 = 512;
-pub const IORING_FEAT_RSRC_TAGS: u32 = 1024;
-pub const IORING_FEAT_CQE_SKIP: u32 = 2048;
-pub const IORING_FEAT_LINKED_FILE: u32 = 4096;
-pub const IORING_FEAT_REG_REG_RING: u32 = 8192;
 pub const IORING_RSRC_REGISTER_SPARSE: u32 = 1;
 pub const IORING_REGISTER_FILES_SKIP: i32 = -2;
 pub const IO_URING_OP_SUPPORTED: u16 = 1;
@@ -425,10 +387,10 @@ pub struct IoCqringOffsets {
 pub struct IoUringParams {
     pub sq_entries: ::std::os::raw::c_uint,
     pub cq_entries: ::std::os::raw::c_uint,
-    pub flags: ::std::os::raw::c_uint,
+    pub flags: SetupFlags,
     pub sq_thread_cpu: ::std::os::raw::c_uint,
     pub sq_thread_idle: ::std::os::raw::c_uint,
-    pub features: ::std::os::raw::c_uint,
+    pub features: FeatureFlags,
     pub wq_fd: ::std::os::raw::c_uint,
     pub resv: [::std::os::raw::c_uint; 3usize],
     pub sq_off: IoSqringOffsets,
@@ -477,7 +439,7 @@ pub struct IoUringRsrcUpdate2 {
 pub struct IoUringProbeOp {
     pub op: ::std::os::raw::c_uchar,
     pub resv: ::std::os::raw::c_uchar,
-    pub flags: ::std::os::raw::c_ushort,
+    pub flags: ProbeOpFlags,
     pub resv2: ::std::os::raw::c_uint,
 }
 
