@@ -5,6 +5,7 @@ pub enum OpType {
     Accept,
     Read,
     Write,
+    Receive,
 }
 
 #[derive(Default, Debug)]

@@ -79,5 +79,21 @@ bitflags! {
     }
 }
 
+bitflags! {
+    #[repr(C)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct SQEFlags: u8 {
+        const FIXED_FILE = 1;
+        const IO_DRAIN = 2;
+        const IO_LINK = 4;
+        const IO_HARDLINK = 8;
+        const ASYNC = 16;
+        const BUFFER_SELECT = 32;
+        const CQE_SKIP_SUCCESS = 64;
+        const _ = !0;
+    }
+
+}
+
 unsafe impl bytemuck::NoUninit for SQFlags {}
 unsafe impl bytemuck::NoUninit for CQFlags {}

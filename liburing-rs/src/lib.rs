@@ -1,3 +1,4 @@
+mod buffer;
 mod cq;
 mod entry;
 mod flags;

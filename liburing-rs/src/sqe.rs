@@ -4,7 +4,7 @@ use std::os::fd::AsRawFd;
 #[derive(Default, Debug, Copy, Clone)]
 pub struct IoUringSqe {
     pub opcode: ::std::os::raw::c_uchar,
-    pub flags: ::std::os::raw::c_uchar,
+    pub flags: crate::flags::SQEFlags,
     pub ioprio: ::std::os::raw::c_ushort,
     pub fd: ::std::os::raw::c_int,
     pub off: ::std::os::raw::c_ulonglong,

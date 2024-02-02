@@ -1,16 +1,18 @@
 use crate::{
+    buffer::BufferGroup,
     cq::CompleteQueue,
     entry::{Entry, OpType},
     flags::*,
-    kernel,
+    kernel, mmap,
     sq::SubmitQueue,
     syscall,
 };
+use std::sync::Arc;
 use std::{os::fd::AsRawFd, sync::atomic::Ordering};
 
 #[derive(Debug)]
 pub struct IoUring {
-    ring_fd: std::fs::File,
+    ring_fd: Arc<std::fs::File>,
     sq: SubmitQueue,
     cq: CompleteQueue,
     pub flags: SetupFlags,
@@ -37,7 +39,7 @@ impl IoUring {
         let cq = CompleteQueue::new(&fd, p, &sq.ring)?;
 
         Ok(IoUring {
-            ring_fd: fd,
+            ring_fd: Arc::new(fd),
             sq,
             cq,
             flags: p.flags,
@@ -157,6 +159,22 @@ impl IoUring {
     }
 
     #[inline]
+    pub fn prep_recv<F: AsRawFd>(&mut self, fd: &F) -> std::io::Result<()> {
+        let sqe = self.sq.get_sqe()?;
+        let entry = Box::new(Entry {
+            op_type: OpType::Receive,
+            multishot: true,
+            ..Default::default()
+        });
+        sqe.prepare(kernel::IORING_OP_RECV, fd, 0, Default::default(), entry);
+        sqe.addr = 0;
+        sqe.ioprio |= kernel::IORING_RECV_MULTISHOT;
+        sqe.flags |= SQEFlags::BUFFER_SELECT;
+        sqe.buf_index = 0;
+        Ok(())
+    }
+
+    #[inline]
     fn cq_needs_flush(&self) -> bool {
         self.sq
             .kflags
@@ -167,6 +185,26 @@ impl IoUring {
     #[inline]
     fn cq_needs_enter(&self) -> bool {
         self.flags.contains(SetupFlags::IOPOLL) || self.cq_needs_flush()
+    }
+
+    pub fn setup_buffer_ring(&mut self, entries: u32, bgid: u16) -> std::io::Result<BufferGroup> {
+        let mut buffer = mmap::Buffer::<kernel::IoUringBuf>::anonymous(entries as usize)?;
+
+        let mut reg = kernel::IoUringBufReg {
+            ring_addr: buffer.as_raw_addr(),
+            ring_entries: entries,
+            bgid,
+            ..Default::default()
+        };
+
+        syscall::io_uring_register(
+            &self.ring_fd,
+            kernel::IORING_REGISTER_PBUF_RING,
+            &mut reg as *mut _ as _,
+            1,
+        )?;
+
+        Ok(BufferGroup::new(self.ring_fd.clone(), buffer, bgid))
     }
 }
 
@@ -340,6 +378,18 @@ mod tests {
             assert_eq!(consumed, 2);
             assert_ne!(entry_addr, 0);
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn buffer_group() -> std::io::Result<()> {
+        use crate::*;
+
+        let mut params = kernel::IoUringParams::default();
+        let mut ring = IoUring::new(64, &mut params)?;
+
+        let _ = ring.setup_buffer_ring(4, 1)?;
 
         Ok(())
     }
