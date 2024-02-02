@@ -13,4 +13,5 @@ repository = "https://github.com/SF-Zhou/ruring"
 atomic.workspace = true
 bitflags.workspace = true
 bytemuck.workspace = true
+bytes.workspace = true
 libc.workspace = true

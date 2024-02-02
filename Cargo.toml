@@ -1,7 +1,5 @@
 [workspace]
-members = [
-  "liburing-rs",
-]
+members = ["liburing-rs"]
 resolver = "2"
 
 [workspace.package]
@@ -14,6 +12,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 atomic = "0"
 bytemuck = "1"
+bytes = "1"
 bitflags = "2"
 libc = "0"
 

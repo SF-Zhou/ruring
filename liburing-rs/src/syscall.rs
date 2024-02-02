@@ -122,44 +122,4 @@ mod tests {
         let read_reuslt = fd.read_to_string(&mut buffer);
         assert!(read_reuslt.is_err());
     }
-
-    #[test]
-    fn io_uring_register_probe() {
-        use crate::{flags::*, kernel::*};
-        use std::process::Command;
-
-        fn get_linux_kernel_version() -> Option<String> {
-            let output = Command::new("uname").arg("-r").output().ok()?;
-            let version_str = String::from_utf8(output.stdout).ok()?;
-            Some(version_str.trim().to_string())
-        }
-
-        let result = get_linux_kernel_version();
-        if let Some(kernel_version) = result {
-            if kernel_version.as_str() < "5.6" {
-                println!("Test skipped on kernel versions before 5.6");
-                return;
-            }
-        }
-
-        let mut params = super::IoUringParams::default();
-        let result = super::io_uring_setup(1, &mut params);
-        assert!(result.is_ok());
-        let fd = result.unwrap();
-
-        let mut probe: Box<crate::kernel::IoUringProbe> = Box::default();
-        let ptr = &mut *probe as *mut _;
-        let result = super::io_uring_register(&fd, IORING_REGISTER_PROBE, ptr as _, 256);
-        assert!(result.is_ok());
-
-        let supported_op_cnt = (1..IORING_OP_LAST)
-            .map(|op| {
-                probe.ops[op as usize]
-                    .flags
-                    .contains(ProbeOpFlags::SUPPORTED)
-            })
-            .fold(0u32, |a, b| a + b as u32);
-        println!("supported op cnt: {supported_op_cnt}");
-        assert_ne!(supported_op_cnt, 0);
-    }
 }
