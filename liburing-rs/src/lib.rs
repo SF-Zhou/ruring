@@ -1,8 +1,14 @@
+mod buffer;
 mod cq;
+mod entry;
+mod flags;
 mod io_uring;
-pub mod kernel;
+#[allow(dead_code)]
+mod kernel;
 mod mmap;
 mod sq;
-pub mod syscall;
+mod sqe;
+mod syscall;
 
 pub use io_uring::IoUring;
+pub use kernel::IoUringParams;

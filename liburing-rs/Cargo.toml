@@ -1,6 +1,6 @@
 [package]
 name = "liburing-rs"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 description = "Rust version of liburing implementation."
 readme = "README.md"
@@ -10,4 +10,8 @@ homepage = "https://github.com/SF-Zhou/ruring"
 repository = "https://github.com/SF-Zhou/ruring"
 
 [dependencies]
+atomic.workspace = true
+bitflags.workspace = true
+bytemuck.workspace = true
+bytes.workspace = true
 libc.workspace = true

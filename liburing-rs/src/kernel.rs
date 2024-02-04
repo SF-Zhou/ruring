@@ -2,24 +2,9 @@
 /* C header file: https://github.com/axboe/liburing/blob/liburing-2.5/src/include/liburing/io_uring.h */
 /* bindgen io_uring.h --no-layout-tests --no-prepend-enum-name --translate-enum-integer-types */
 
+use crate::flags::*;
+
 pub const IORING_FILE_INDEX_ALLOC: i32 = -1;
-pub const IORING_SETUP_IOPOLL: u32 = 1;
-pub const IORING_SETUP_SQPOLL: u32 = 2;
-pub const IORING_SETUP_SQ_AFF: u32 = 4;
-pub const IORING_SETUP_CQSIZE: u32 = 8;
-pub const IORING_SETUP_CLAMP: u32 = 16;
-pub const IORING_SETUP_ATTACH_WQ: u32 = 32;
-pub const IORING_SETUP_R_DISABLED: u32 = 64;
-pub const IORING_SETUP_SUBMIT_ALL: u32 = 128;
-pub const IORING_SETUP_COOP_TASKRUN: u32 = 256;
-pub const IORING_SETUP_TASKRUN_FLAG: u32 = 512;
-pub const IORING_SETUP_SQE128: u32 = 1024;
-pub const IORING_SETUP_CQE32: u32 = 2048;
-pub const IORING_SETUP_SINGLE_ISSUER: u32 = 4096;
-pub const IORING_SETUP_DEFER_TASKRUN: u32 = 8192;
-pub const IORING_SETUP_NO_MMAP: u32 = 16384;
-pub const IORING_SETUP_REGISTERED_FD_ONLY: u32 = 32768;
-pub const IORING_SETUP_NO_SQARRAY: u32 = 65536;
 pub const IORING_URING_CMD_FIXED: u32 = 1;
 pub const IORING_FSYNC_DATASYNC: u32 = 1;
 pub const IORING_TIMEOUT_ABS: u32 = 1;
@@ -41,11 +26,11 @@ pub const IORING_ASYNC_CANCEL_FD: u32 = 2;
 pub const IORING_ASYNC_CANCEL_ANY: u32 = 4;
 pub const IORING_ASYNC_CANCEL_FD_FIXED: u32 = 8;
 pub const IORING_RECVSEND_POLL_FIRST: u32 = 1;
-pub const IORING_RECV_MULTISHOT: u32 = 2;
+pub const IORING_RECV_MULTISHOT: u16 = 2;
 pub const IORING_RECVSEND_FIXED_BUF: u32 = 4;
 pub const IORING_SEND_ZC_REPORT_USAGE: u32 = 8;
 pub const IORING_NOTIF_USAGE_ZC_COPIED: u32 = 2147483648;
-pub const IORING_ACCEPT_MULTISHOT: u32 = 1;
+pub const IORING_ACCEPT_MULTISHOT: u16 = 1;
 pub const IORING_MSG_RING_CQE_SKIP: u32 = 1;
 pub const IORING_MSG_RING_FLAGS_PASS: u32 = 2;
 pub const IORING_FIXED_FD_NO_CLOEXEC: u32 = 1;
@@ -59,29 +44,6 @@ pub const IORING_OFF_SQES: i64 = 268435456;
 pub const IORING_OFF_PBUF_RING: i64 = 2147483648;
 pub const IORING_OFF_PBUF_SHIFT: i64 = 16;
 pub const IORING_OFF_MMAP_MASK: i64 = 4160749568;
-pub const IORING_SQ_NEED_WAKEUP: u32 = 1;
-pub const IORING_SQ_CQ_OVERFLOW: u32 = 2;
-pub const IORING_SQ_TASKRUN: u32 = 4;
-pub const IORING_CQ_EVENTFD_DISABLED: u32 = 1;
-pub const IORING_ENTER_GETEVENTS: u32 = 1;
-pub const IORING_ENTER_SQ_WAKEUP: u32 = 2;
-pub const IORING_ENTER_SQ_WAIT: u32 = 4;
-pub const IORING_ENTER_EXT_ARG: u32 = 8;
-pub const IORING_ENTER_REGISTERED_RING: u32 = 16;
-pub const IORING_FEAT_SINGLE_MMAP: u32 = 1;
-pub const IORING_FEAT_NODROP: u32 = 2;
-pub const IORING_FEAT_SUBMIT_STABLE: u32 = 4;
-pub const IORING_FEAT_RW_CUR_POS: u32 = 8;
-pub const IORING_FEAT_CUR_PERSONALITY: u32 = 16;
-pub const IORING_FEAT_FAST_POLL: u32 = 32;
-pub const IORING_FEAT_POLL_32BITS: u32 = 64;
-pub const IORING_FEAT_SQPOLL_NONFIXED: u32 = 128;
-pub const IORING_FEAT_EXT_ARG: u32 = 256;
-pub const IORING_FEAT_NATIVE_WORKERS: u32 = 512;
-pub const IORING_FEAT_RSRC_TAGS: u32 = 1024;
-pub const IORING_FEAT_CQE_SKIP: u32 = 2048;
-pub const IORING_FEAT_LINKED_FILE: u32 = 4096;
-pub const IORING_FEAT_REG_REG_RING: u32 = 8192;
 pub const IORING_RSRC_REGISTER_SPARSE: u32 = 1;
 pub const IORING_REGISTER_FILES_SKIP: i32 = -2;
 pub const IO_URING_OP_SUPPORTED: u16 = 1;
@@ -200,191 +162,7 @@ pub struct KernelTimespec {
 }
 
 #[repr(C)]
-#[derive(Default, Debug)]
-pub struct IoUringSqe {
-    pub opcode: ::std::os::raw::c_uchar,
-    pub flags: ::std::os::raw::c_uchar,
-    pub ioprio: ::std::os::raw::c_ushort,
-    pub fd: ::std::os::raw::c_int,
-    pub union1: IoUringSqeUnion1,
-    pub union2: IoUringSqeUnion2,
-    pub len: ::std::os::raw::c_uint,
-    pub union3: IoUringSqeUnion3,
-    pub user_data: ::std::os::raw::c_ulonglong,
-    pub union4: IoUringSqeUnion4,
-    pub personality: ::std::os::raw::c_ushort,
-    pub union5: IoUringSqeUnion5,
-    pub union6: IoUringSqeUnion6,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union IoUringSqeUnion1 {
-    pub off: ::std::os::raw::c_ulonglong,
-    pub addr2: ::std::os::raw::c_ulonglong,
-    pub cmd_op: IoUringSqeUnion1CmdOp,
-}
-
-impl Default for IoUringSqeUnion1 {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
-    }
-}
-
-impl ::std::fmt::Debug for IoUringSqeUnion1 {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("IoUringSqeUnion1")
-    }
-}
-
-#[repr(C)]
 #[derive(Default, Debug, Copy, Clone)]
-pub struct IoUringSqeUnion1CmdOp {
-    pub cmd_op: ::std::os::raw::c_uint,
-    pub __pad1: ::std::os::raw::c_uint,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union IoUringSqeUnion2 {
-    pub addr: ::std::os::raw::c_ulonglong,
-    pub splice_off_in: ::std::os::raw::c_ulonglong,
-    pub level_and_optname: IoUringSqeUnion2LevelAndOptName,
-}
-
-impl Default for IoUringSqeUnion2 {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
-    }
-}
-
-impl ::std::fmt::Debug for IoUringSqeUnion2 {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("IoUringSqeUnion2")
-    }
-}
-
-#[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
-pub struct IoUringSqeUnion2LevelAndOptName {
-    pub level: ::std::os::raw::c_uint,
-    pub optname: ::std::os::raw::c_uint,
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union IoUringSqeUnion3 {
-    pub rw_flags: ::std::os::raw::c_int,
-    pub fsync_flags: ::std::os::raw::c_uint,
-    pub poll_events: ::std::os::raw::c_ushort,
-    pub poll32_events: ::std::os::raw::c_uint,
-    pub sync_range_flags: ::std::os::raw::c_uint,
-    pub msg_flags: ::std::os::raw::c_uint,
-    pub timeout_flags: ::std::os::raw::c_uint,
-    pub accept_flags: ::std::os::raw::c_uint,
-    pub cancel_flags: ::std::os::raw::c_uint,
-    pub open_flags: ::std::os::raw::c_uint,
-    pub statx_flags: ::std::os::raw::c_uint,
-    pub fadvise_advice: ::std::os::raw::c_uint,
-    pub splice_flags: ::std::os::raw::c_uint,
-    pub rename_flags: ::std::os::raw::c_uint,
-    pub unlink_flags: ::std::os::raw::c_uint,
-    pub hardlink_flags: ::std::os::raw::c_uint,
-    pub xattr_flags: ::std::os::raw::c_uint,
-    pub msg_ring_flags: ::std::os::raw::c_uint,
-    pub uring_cmd_flags: ::std::os::raw::c_uint,
-    pub waitid_flags: ::std::os::raw::c_uint,
-    pub futex_flags: ::std::os::raw::c_uint,
-    pub install_fd_flags: ::std::os::raw::c_uint,
-}
-
-impl Default for IoUringSqeUnion3 {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
-    }
-}
-
-impl ::std::fmt::Debug for IoUringSqeUnion3 {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("IoUringSqeUnion3")
-    }
-}
-
-#[repr(C, packed)]
-#[derive(Copy, Clone)]
-pub union IoUringSqeUnion4 {
-    pub buf_index: ::std::os::raw::c_ushort,
-    pub buf_group: ::std::os::raw::c_ushort,
-}
-
-impl Default for IoUringSqeUnion4 {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
-    }
-}
-
-impl ::std::fmt::Debug for IoUringSqeUnion4 {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("IoUringSqeUnion4")
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union IoUringSqeUnion5 {
-    pub splice_fd_in: ::std::os::raw::c_int,
-    pub file_index: ::std::os::raw::c_uint,
-    pub optlen: ::std::os::raw::c_uint,
-    pub addr_len: IoUringSqeUnion5AddrLen,
-}
-
-impl Default for IoUringSqeUnion5 {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
-    }
-}
-
-impl ::std::fmt::Debug for IoUringSqeUnion5 {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("IoUringSqeUnion5")
-    }
-}
-
-#[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
-pub struct IoUringSqeUnion5AddrLen {
-    pub addr_len: ::std::os::raw::c_ushort,
-    pub __pad3: [::std::os::raw::c_ushort; 1usize],
-}
-
-#[repr(C)]
-pub union IoUringSqeUnion6 {
-    pub addr3: IoUringSqeUnion6Addr3,
-    pub optval: ::std::os::raw::c_ulonglong,
-    pub cmd: [::std::os::raw::c_uchar; 16usize],
-}
-
-impl Default for IoUringSqeUnion6 {
-    fn default() -> Self {
-        unsafe { std::mem::zeroed() }
-    }
-}
-
-impl ::std::fmt::Debug for IoUringSqeUnion6 {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("IoUringSqeUnion6")
-    }
-}
-
-#[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
-pub struct IoUringSqeUnion6Addr3 {
-    pub addr3: ::std::os::raw::c_ulonglong,
-    pub __pad2: [::std::os::raw::c_ulonglong; 1usize],
-}
-
-#[repr(C)]
-#[derive(Debug)]
 pub struct IoUringCqe {
     pub user_data: ::std::os::raw::c_ulonglong,
     pub res: ::std::os::raw::c_int,
@@ -425,10 +203,10 @@ pub struct IoCqringOffsets {
 pub struct IoUringParams {
     pub sq_entries: ::std::os::raw::c_uint,
     pub cq_entries: ::std::os::raw::c_uint,
-    pub flags: ::std::os::raw::c_uint,
+    pub flags: SetupFlags,
     pub sq_thread_cpu: ::std::os::raw::c_uint,
     pub sq_thread_idle: ::std::os::raw::c_uint,
-    pub features: ::std::os::raw::c_uint,
+    pub features: FeatureFlags,
     pub wq_fd: ::std::os::raw::c_uint,
     pub resv: [::std::os::raw::c_uint; 3usize],
     pub sq_off: IoSqringOffsets,
@@ -477,7 +255,7 @@ pub struct IoUringRsrcUpdate2 {
 pub struct IoUringProbeOp {
     pub op: ::std::os::raw::c_uchar,
     pub resv: ::std::os::raw::c_uchar,
-    pub flags: ::std::os::raw::c_ushort,
+    pub flags: ProbeOpFlags,
     pub resv2: ::std::os::raw::c_uint,
 }
 
@@ -498,20 +276,12 @@ impl Default for IoUringProbe {
 }
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct IoUringRestriction {
     pub opcode: ::std::os::raw::c_ushort,
-    pub union1: IoUringRestrictionUnion1,
+    pub sqe_op: ::std::os::raw::c_uchar,
     pub resv: ::std::os::raw::c_uchar,
     pub resv2: [::std::os::raw::c_uint; 3usize],
-}
-
-#[repr(C)]
-#[derive(Copy, Clone)]
-pub union IoUringRestrictionUnion1 {
-    pub register_op: ::std::os::raw::c_uchar,
-    pub sqe_op: ::std::os::raw::c_uchar,
-    pub sqe_flags: ::std::os::raw::c_uchar,
 }
 
 #[repr(C)]
@@ -524,6 +294,7 @@ pub struct IoUringBuf {
 }
 
 #[repr(C)]
+#[derive(Default, Debug, Copy, Clone)]
 pub struct IoUringBufRing {
     pub bufs: [IoUringBuf; 1usize],
 }
@@ -572,12 +343,4 @@ pub struct IoUringRecvmsgOut {
     pub controllen: ::std::os::raw::c_uint,
     pub payloadlen: ::std::os::raw::c_uint,
     pub flags: ::std::os::raw::c_uint,
-}
-
-mod tests {
-    #[test]
-    fn check_io_uring_sqe_size() {
-        assert_eq!(std::mem::size_of::<super::IoUringSqe>(), 64);
-        assert_eq!(std::mem::size_of::<super::IoUringCqe>(), 16);
-    }
 }

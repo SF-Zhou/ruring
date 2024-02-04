@@ -17,6 +17,26 @@ impl<T> Buffer<T> {
             ) as *mut T
         };
 
+        Self::from_ptr_and_len(ptr, len)
+    }
+
+    pub fn anonymous(len: usize) -> std::io::Result<Self> {
+        let ptr = unsafe {
+            libc::mmap(
+                std::ptr::null_mut(),
+                std::mem::size_of::<T>() * len,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_ANONYMOUS | libc::MAP_PRIVATE,
+                -1,
+                0,
+            ) as *mut T
+        };
+
+        Self::from_ptr_and_len(ptr, len)
+    }
+
+    #[inline]
+    fn from_ptr_and_len(ptr: *mut T, len: usize) -> std::io::Result<Self> {
         if Self::is_err(ptr) {
             return Err(Self::ptr_err(ptr));
         }
@@ -32,6 +52,10 @@ impl<T> Buffer<T> {
 
     pub fn offset_as_mut_slice<O>(&self, offset: usize, len: usize) -> &'static mut [O] {
         unsafe { std::slice::from_raw_parts_mut(self.buf.as_ptr().wrapping_add(offset) as _, len) }
+    }
+
+    pub fn as_raw_addr(&mut self) -> u64 {
+        self.buf.as_mut_ptr() as _
     }
 
     #[inline]

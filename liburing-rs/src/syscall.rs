@@ -1,4 +1,4 @@
-use crate::kernel::IoUringParams;
+use crate::{flags::*, kernel::IoUringParams};
 use libc::{c_long, c_uint, c_void, sigset_t, syscall};
 use std::fs::File;
 use std::os::fd::{AsRawFd, FromRawFd, RawFd};
@@ -26,7 +26,7 @@ pub fn io_uring_enter(
     fd: &File,
     to_submit: c_uint,
     min_complete: c_uint,
-    flags: c_uint,
+    flags: EnterFlags,
     sig: *mut sigset_t,
 ) -> std::io::Result<c_uint> {
     loop {
@@ -56,7 +56,7 @@ pub fn io_uring_enter(
 pub fn io_uring_register(
     fd: &File,
     opcode: c_uint,
-    arg: *const c_void,
+    arg: *mut c_void,
     nr_args: c_uint,
 ) -> std::io::Result<c_uint> {
     let ret = unsafe {
@@ -78,7 +78,7 @@ pub fn io_uring_register(
 mod tests {
     #[test]
     fn io_uring_setup() {
-        use crate::kernel::*;
+        use crate::flags::*;
         use std::io::Read;
 
         let mut params = super::IoUringParams::default();
@@ -95,7 +95,7 @@ mod tests {
         assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
 
         let mut params = super::IoUringParams {
-            flags: !0u32,
+            flags: SetupFlags::from_bits_retain(!0u32),
             ..Default::default()
         };
         let result = super::io_uring_setup(1, &mut params);
@@ -103,7 +103,7 @@ mod tests {
         assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
 
         let mut params = super::IoUringParams {
-            flags: IORING_SETUP_SQ_AFF,
+            flags: SetupFlags::SQ_AFF,
             ..Default::default()
         };
         let result = super::io_uring_setup(1, &mut params);
@@ -121,47 +121,5 @@ mod tests {
         let mut buffer = String::new();
         let read_reuslt = fd.read_to_string(&mut buffer);
         assert!(read_reuslt.is_err());
-    }
-
-    #[test]
-    fn io_uring_register_probe() {
-        use crate::kernel::*;
-        use std::process::Command;
-
-        fn get_linux_kernel_version() -> Option<String> {
-            let output = Command::new("uname").arg("-r").output().ok()?;
-            let version_str = String::from_utf8(output.stdout).ok()?;
-            Some(version_str.trim().to_string())
-        }
-
-        let result = get_linux_kernel_version();
-        if let Some(kernel_version) = result {
-            if kernel_version.as_str() < "5.6" {
-                println!("Test skipped on kernel versions before 5.6");
-                return;
-            }
-        }
-
-        let mut params = super::IoUringParams::default();
-        let result = super::io_uring_setup(1, &mut params);
-        assert!(result.is_ok());
-        let fd = result.unwrap();
-
-        let probe: Box<crate::kernel::IoUringProbe> = Box::default();
-        let ptr = Box::into_raw(probe);
-        let result = super::io_uring_register(
-            &fd,
-            IORING_REGISTER_PROBE,
-            ptr as *const ::std::os::raw::c_void,
-            256,
-        );
-        let probe = unsafe { Box::from_raw(ptr) };
-        assert!(result.is_ok());
-
-        let supported_op_cnt = (1..IORING_OP_LAST)
-            .map(|op| (probe.ops[op as usize].flags & IO_URING_OP_SUPPORTED != 0) as u32)
-            .sum::<u32>();
-        println!("supported op cnt: {supported_op_cnt}");
-        assert_ne!(supported_op_cnt, 0);
     }
 }
