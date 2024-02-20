@@ -1,16 +1,16 @@
-use crate::{entry, flags::*, kernel, mmap};
+use crate::{flags::*, kernel, mmap};
 use std::fs::File;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 
 pub struct CompleteQueue {
     _ring: Arc<mmap::Buffer<u8>>,
-    khead: &'static mut AtomicU32,
-    ktail: &'static mut AtomicU32,
+    pub khead: &'static mut AtomicU32,
+    pub ktail: &'static mut AtomicU32,
     _kflags: &'static mut atomic::Atomic<CQFlags>,
     _koverflow: &'static mut AtomicU32,
-    cqes: &'static mut [kernel::IoUringCqe],
-    ring_mask: u32,
+    pub cqes: &'static mut [kernel::IoUringCqe],
+    pub ring_mask: u32,
     _ring_entries: u32,
 }
 
@@ -52,28 +52,5 @@ impl CompleteQueue {
             _ring_entries: *ring.offset_as_mut(p.cq_off.ring_entries as usize),
             _ring: ring,
         })
-    }
-
-    pub fn for_each_cqe<F>(&mut self, mut f: F) -> u32
-    where
-        F: FnMut(&entry::Entry),
-    {
-        let mut entries = 0u32;
-        let mut head = self.khead.load(Ordering::Relaxed);
-        while head != self.ktail.load(Ordering::Acquire) {
-            let index = head & self.ring_mask;
-            let cqe = &self.cqes[index as usize];
-            let mut entry = unsafe { Box::<entry::Entry>::from_raw(cqe.user_data as _) };
-            entry.res = cqe.res;
-            entry.flags = cqe.flags;
-            f(entry.as_ref());
-            if entry.multishot {
-                let _ = Box::into_raw(entry);
-            }
-            head += 1;
-            entries += 1;
-        }
-        self.khead.store(head, Ordering::Release);
-        entries
     }
 }

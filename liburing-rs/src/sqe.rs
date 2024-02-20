@@ -27,7 +27,7 @@ impl IoUringSqe {
         fd: &impl AsRawFd,
         offset: u64,
         buf: &mut [u8],
-        entry: Box<crate::entry::Entry>,
+        entry: u32,
     ) {
         *self = Self {
             opcode,
@@ -35,7 +35,20 @@ impl IoUringSqe {
             off: offset,
             addr: buf.as_mut_ptr() as u64,
             len: buf.len() as u32,
-            user_data: Box::into_raw(entry) as _,
+            user_data: entry as _,
+            ..Default::default()
+        }
+    }
+
+    #[inline]
+    pub fn prepare2(&mut self, opcode: u8, fd: i32, offset: u64, buf: &mut [u8], entry: u32) {
+        *self = Self {
+            opcode,
+            fd,
+            off: offset,
+            addr: buf.as_mut_ptr() as u64,
+            len: buf.len() as u32,
+            user_data: entry as _,
             ..Default::default()
         }
     }

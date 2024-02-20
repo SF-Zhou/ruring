@@ -152,7 +152,7 @@ mod tests {
         while sum < N * entries {
             let remain = N * entries - sum;
             assert_eq!(io_uring.submit(0, remain.min(entries))?, 0);
-            let consume = io_uring.for_each_cqe(|_| {});
+            let consume = io_uring.for_each_cqe(|_, _| {});
             sum += consume;
         }
 

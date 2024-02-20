@@ -1,10 +1,10 @@
 mod buffer;
 mod cq;
-mod entry;
-mod flags;
+pub mod entry;
+pub mod flags;
 mod io_uring;
 #[allow(dead_code)]
-mod kernel;
+pub mod kernel;
 mod mmap;
 mod sq;
 mod sqe;

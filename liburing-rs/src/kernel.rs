@@ -25,19 +25,15 @@ pub const IORING_ASYNC_CANCEL_ALL: u32 = 1;
 pub const IORING_ASYNC_CANCEL_FD: u32 = 2;
 pub const IORING_ASYNC_CANCEL_ANY: u32 = 4;
 pub const IORING_ASYNC_CANCEL_FD_FIXED: u32 = 8;
-pub const IORING_RECVSEND_POLL_FIRST: u32 = 1;
+pub const IORING_RECVSEND_POLL_FIRST: u16 = 1;
 pub const IORING_RECV_MULTISHOT: u16 = 2;
-pub const IORING_RECVSEND_FIXED_BUF: u32 = 4;
+pub const IORING_RECVSEND_FIXED_BUF: u16 = 4;
 pub const IORING_SEND_ZC_REPORT_USAGE: u32 = 8;
 pub const IORING_NOTIF_USAGE_ZC_COPIED: u32 = 2147483648;
 pub const IORING_ACCEPT_MULTISHOT: u16 = 1;
 pub const IORING_MSG_RING_CQE_SKIP: u32 = 1;
 pub const IORING_MSG_RING_FLAGS_PASS: u32 = 2;
 pub const IORING_FIXED_FD_NO_CLOEXEC: u32 = 1;
-pub const IORING_CQE_F_BUFFER: u32 = 1;
-pub const IORING_CQE_F_MORE: u32 = 2;
-pub const IORING_CQE_F_SOCK_NONEMPTY: u32 = 4;
-pub const IORING_CQE_F_NOTIF: u32 = 8;
 pub const IORING_OFF_SQ_RING: i64 = 0;
 pub const IORING_OFF_CQ_RING: i64 = 134217728;
 pub const IORING_OFF_SQES: i64 = 268435456;
@@ -47,13 +43,6 @@ pub const IORING_OFF_MMAP_MASK: i64 = 4160749568;
 pub const IORING_RSRC_REGISTER_SPARSE: u32 = 1;
 pub const IORING_REGISTER_FILES_SKIP: i32 = -2;
 pub const IO_URING_OP_SUPPORTED: u16 = 1;
-pub const IOSQE_FIXED_FILE_BIT: u32 = 0;
-pub const IOSQE_IO_DRAIN_BIT: u32 = 1;
-pub const IOSQE_IO_LINK_BIT: u32 = 2;
-pub const IOSQE_IO_HARDLINK_BIT: u32 = 3;
-pub const IOSQE_ASYNC_BIT: u32 = 4;
-pub const IOSQE_BUFFER_SELECT_BIT: u32 = 5;
-pub const IOSQE_CQE_SKIP_SUCCESS_BIT: u32 = 6;
 pub const IORING_OP_NOP: u8 = 0;
 pub const IORING_OP_READV: u8 = 1;
 pub const IORING_OP_WRITEV: u8 = 2;
@@ -285,18 +274,12 @@ pub struct IoUringRestriction {
 }
 
 #[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
+#[derive(Default, Debug)]
 pub struct IoUringBuf {
     pub addr: ::std::os::raw::c_ulonglong,
     pub len: ::std::os::raw::c_uint,
     pub bid: ::std::os::raw::c_ushort,
-    pub tail: ::std::os::raw::c_ushort,
-}
-
-#[repr(C)]
-#[derive(Default, Debug, Copy, Clone)]
-pub struct IoUringBufRing {
-    pub bufs: [IoUringBuf; 1usize],
+    pub tail: std::sync::atomic::AtomicU16,
 }
 
 #[repr(C)]

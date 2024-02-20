@@ -17,6 +17,8 @@ pub struct IoUring {
     cq: CompleteQueue,
     pub flags: SetupFlags,
     pub features: FeatureFlags,
+    vec: Vec<Entry>,
+    que: Vec<u32>,
 }
 
 impl IoUring {
@@ -44,6 +46,8 @@ impl IoUring {
             cq,
             flags: p.flags,
             features: p.features,
+            vec: vec![Entry::default(); entries as usize],
+            que: (0..entries).collect(),
         })
     }
 
@@ -80,11 +84,30 @@ impl IoUring {
         Ok(probe)
     }
 
-    pub fn for_each_cqe<F>(&mut self, f: F) -> u32
+    pub fn for_each_cqe<F>(&mut self, mut f: F) -> u32
     where
-        F: FnMut(&Entry),
+        F: FnMut(&mut IoUring, &Entry),
     {
-        self.cq.for_each_cqe(f)
+        let mut entries = 0u32;
+        let mut head = self.cq.khead.load(Ordering::Relaxed);
+        while head != self.cq.ktail.load(Ordering::Acquire) {
+            let index = head & self.cq.ring_mask;
+            let cqe = &self.cq.cqes[index as usize];
+            let entry_index = cqe.user_data as u32;
+            let entry = unsafe { &mut *(&mut self.vec[cqe.user_data as usize] as *mut Entry) };
+            entry.res = cqe.res;
+            entry.flags = CQEFlags::from_bits_retain(cqe.flags as u16);
+            entry.bid = (cqe.flags >> kernel::IORING_CQE_BUFFER_SHIFT) as u16;
+            f(self, entry);
+            if entry.multishot && entry.flags.contains(CQEFlags::MORE) {
+            } else {
+                self.que.push(entry_index);
+            }
+            head += 1;
+            entries += 1;
+        }
+        self.cq.khead.store(head, Ordering::Release);
+        entries
     }
 
     #[inline]
@@ -95,11 +118,15 @@ impl IoUring {
     #[inline]
     pub fn nop(&mut self) -> std::io::Result<()> {
         let sqe = self.sq.get_sqe()?;
-        let entry = Box::new(Entry {
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
             op_type: OpType::Nop,
             multishot: false,
             ..Default::default()
-        });
+        };
         sqe.prepare(
             kernel::IORING_OP_NOP,
             &self.ring_fd,
@@ -118,11 +145,15 @@ impl IoUring {
         buf: &mut [u8],
     ) -> std::io::Result<()> {
         let sqe = self.sq.get_sqe()?;
-        let entry = Box::new(Entry {
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
             op_type: OpType::Read,
             multishot: false,
             ..Default::default()
-        });
+        };
         sqe.prepare(kernel::IORING_OP_READ, fd, offset, buf, entry);
         Ok(())
     }
@@ -135,11 +166,15 @@ impl IoUring {
         buf: &mut [u8],
     ) -> std::io::Result<()> {
         let sqe = self.sq.get_sqe()?;
-        let entry = Box::new(Entry {
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
             op_type: OpType::Write,
             multishot: false,
             ..Default::default()
-        });
+        };
         sqe.prepare(kernel::IORING_OP_WRITE, fd, offset, buf, entry);
         Ok(())
     }
@@ -147,11 +182,15 @@ impl IoUring {
     #[inline]
     pub fn prep_accept<F: AsRawFd>(&mut self, fd: &F) -> std::io::Result<()> {
         let sqe = self.sq.get_sqe()?;
-        let entry = Box::new(Entry {
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
             op_type: OpType::Accept,
             multishot: true,
             ..Default::default()
-        });
+        };
         sqe.prepare(kernel::IORING_OP_ACCEPT, fd, 0, Default::default(), entry);
         sqe.addr = 0;
         sqe.ioprio |= kernel::IORING_ACCEPT_MULTISHOT;
@@ -159,18 +198,90 @@ impl IoUring {
     }
 
     #[inline]
-    pub fn prep_recv<F: AsRawFd>(&mut self, fd: &F) -> std::io::Result<()> {
+    pub fn prep_recv(&mut self, fd: Arc<std::net::TcpStream>, bgid: u16) -> std::io::Result<()> {
         let sqe = self.sq.get_sqe()?;
-        let entry = Box::new(Entry {
+        let raw_fd = fd.as_raw_fd();
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
             op_type: OpType::Receive,
             multishot: true,
+            fd: Some(fd),
             ..Default::default()
-        });
-        sqe.prepare(kernel::IORING_OP_RECV, fd, 0, Default::default(), entry);
+        };
+        sqe.prepare2(kernel::IORING_OP_RECV, raw_fd, 0, Default::default(), entry);
         sqe.addr = 0;
-        sqe.ioprio |= kernel::IORING_RECV_MULTISHOT;
+        sqe.ioprio |= kernel::IORING_RECV_MULTISHOT | kernel::IORING_RECVSEND_POLL_FIRST;
         sqe.flags |= SQEFlags::BUFFER_SELECT;
+        sqe.op_flags |= libc::MSG_ZEROCOPY as u32;
+        sqe.buf_index = bgid;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn prep_send(
+        &mut self,
+        fd: Arc<std::net::TcpStream>,
+        bid: u16,
+        addr: u64,
+        len: u32,
+    ) -> std::io::Result<()> {
+        let sqe = self.sq.get_sqe()?;
+        let raw_fd = fd.as_raw_fd();
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
+            op_type: OpType::Send,
+            multishot: true,
+            fd: Some(fd),
+            send_bid: bid,
+            len,
+            ..Default::default()
+        };
+        sqe.prepare2(kernel::IORING_OP_SEND, raw_fd, 0, Default::default(), entry);
+        sqe.addr = addr;
+        sqe.len = len;
+        sqe.op_flags = libc::MSG_WAITALL as _;
+        Ok(())
+    }
+
+    #[inline]
+    pub fn prep_send_zc(
+        &mut self,
+        fd: Arc<std::net::TcpStream>,
+        bid: u16,
+        addr: u64,
+        len: u32,
+    ) -> std::io::Result<()> {
+        let sqe = self.sq.get_sqe()?;
+        let raw_fd = fd.as_raw_fd();
+        let entry = self
+            .que
+            .pop()
+            .ok_or(std::io::Error::from_raw_os_error(libc::ENOMEM))?;
+        self.vec[entry as usize] = Entry {
+            op_type: OpType::SendZeroCopy,
+            multishot: true,
+            fd: Some(fd),
+            send_bid: bid,
+            ..Default::default()
+        };
+        sqe.prepare2(
+            kernel::IORING_OP_SEND_ZC,
+            raw_fd,
+            0,
+            Default::default(),
+            entry,
+        );
+        sqe.addr = addr;
+        sqe.len = len;
+        sqe.ioprio |= kernel::IORING_RECVSEND_FIXED_BUF;
         sqe.buf_index = 0;
+        sqe.op_flags = libc::MSG_WAITALL as _;
         Ok(())
     }
 
@@ -187,7 +298,12 @@ impl IoUring {
         self.flags.contains(SetupFlags::IOPOLL) || self.cq_needs_flush()
     }
 
-    pub fn setup_buffer_ring(&mut self, entries: u32, bgid: u16) -> std::io::Result<BufferGroup> {
+    pub fn setup_buffer_ring(
+        &mut self,
+        bgid: u16,
+        entries: u32,
+        size: usize,
+    ) -> std::io::Result<BufferGroup> {
         let mut buffer = mmap::Buffer::<kernel::IoUringBuf>::anonymous(entries as usize)?;
 
         let mut reg = kernel::IoUringBufReg {
@@ -204,7 +320,17 @@ impl IoUring {
             1,
         )?;
 
-        Ok(BufferGroup::new(self.ring_fd.clone(), buffer, bgid))
+        let mut buffer_group = BufferGroup::new(self.ring_fd.clone(), buffer, bgid, entries, size);
+
+        let mut iovec = buffer_group.iovec();
+        syscall::io_uring_register(
+            &self.ring_fd,
+            kernel::IORING_REGISTER_BUFFERS,
+            &mut iovec as *mut _ as _,
+            1,
+        )?;
+
+        Ok(buffer_group)
     }
 }
 
@@ -237,7 +363,7 @@ mod tests {
         assert_eq!(entries, submitted);
 
         let mut index = 0;
-        let consumed = ring.for_each_cqe(|_| {
+        let consumed = ring.for_each_cqe(|_, _| {
             index += 1;
         });
         assert_eq!(consumed, submitted);
@@ -262,7 +388,7 @@ mod tests {
         let submitted = ring.submit(1, 1)?;
         assert_eq!(submitted, 1);
 
-        let consumed = ring.for_each_cqe(|entry| {
+        let consumed = ring.for_each_cqe(|_, entry| {
             assert_eq!(entry.res, LEN as i32);
             assert_ne!(buf, vec![0u8; 64]);
         });
@@ -298,7 +424,7 @@ mod tests {
         let submitted = ring.submit(2, 2)?;
         assert_eq!(submitted, 2);
 
-        let consumed = ring.for_each_cqe(|entry| {
+        let consumed = ring.for_each_cqe(|_, entry| {
             assert_eq!(entry.res, LEN as i32);
             if entry.op_type == entry::OpType::Read {
                 assert_eq!(writer_buf, reader_buf);
@@ -366,7 +492,7 @@ mod tests {
             ring.submit(0, 2)?;
 
             let mut entry_addr = 0u64;
-            let consumed = ring.for_each_cqe(|entry| {
+            let consumed = ring.for_each_cqe(|_, entry| {
                 assert!(entry.res >= 0);
                 assert!(entry.op_type == entry::OpType::Accept);
                 if entry_addr == 0 {
@@ -384,12 +510,12 @@ mod tests {
 
     #[test]
     fn buffer_group() -> std::io::Result<()> {
-        use crate::*;
+        use super::*;
 
         let mut params = kernel::IoUringParams::default();
         let mut ring = IoUring::new(64, &mut params)?;
 
-        let _ = ring.setup_buffer_ring(4, 1)?;
+        let _ = ring.setup_buffer_ring(128, 1, 128 * 1024usize)?;
 
         Ok(())
     }
