@@ -1,15 +1,15 @@
-[workspace]
-members = ["liburing-rs"]
-resolver = "2"
-
-[workspace.package]
-authors = ["SF-Zhou <sfzhou.scut@gmail.com>"]
+[package]
+name = "ruring"
+version = "0.1.2"
 edition = "2021"
+description = "High-performance network library based on io_uring."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+documentation = "https://github.com/SF-Zhou/ruring"
 homepage = "https://github.com/SF-Zhou/ruring"
 repository = "https://github.com/SF-Zhou/ruring"
-license = "MIT OR Apache-2.0"
 
-[workspace.dependencies]
+[dependencies]
 atomic = "0"
 bytemuck = "1"
 bytes = "1"
