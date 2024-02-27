@@ -23,7 +23,9 @@ bitflags! {
         const NO_SQARRAY = 65536;
         const _ = !0;
     }
+}
 
+bitflags! {
     #[repr(C)]
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct FeatureFlags: u32 {
@@ -43,7 +45,9 @@ bitflags! {
         const REG_REG_RING = 8192;
         const _ = !0;
     }
+}
 
+bitflags! {
     #[repr(C)]
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct SQFlags: u32 {
@@ -52,14 +56,18 @@ bitflags! {
         const TASKRUN = 4;
         const _ = !0;
     }
+}
 
+bitflags! {
     #[repr(C)]
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct CQFlags: u32 {
         const EVENTFD_DISABLED = 1;
         const _ = !0;
     }
+}
 
+bitflags! {
     #[repr(C)]
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct EnterFlags: u32 {
@@ -70,7 +78,9 @@ bitflags! {
         const REGISTERED_RING = 16;
         const _ = !0;
     }
+}
 
+bitflags! {
     #[repr(C)]
     #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct ProbeOpFlags: u16 {
@@ -92,7 +102,18 @@ bitflags! {
         const CQE_SKIP_SUCCESS = 64;
         const _ = !0;
     }
+}
 
+bitflags! {
+    #[repr(C)]
+    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct CQEFlags: u16 {
+        const BUFFER = 1;
+        const MORE = 2;
+        const SOCK_NONEMPTY = 4;
+        const NOTIF = 8;
+        const _ = !0;
+    }
 }
 
 unsafe impl bytemuck::NoUninit for SQFlags {}
