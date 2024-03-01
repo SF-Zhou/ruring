@@ -1,8 +1,8 @@
-#[derive(Default, Clone, Copy, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Config {
     pub entries: u32,
-    pub recv_buffer_size: u32,
-    pub recv_buffer_count: u32,
+    pub recv_buffer_size: usize,
+    pub recv_buffer_count: usize,
 }
 
 impl Config {

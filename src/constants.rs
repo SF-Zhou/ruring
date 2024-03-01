@@ -74,6 +74,7 @@ bitflags! {
         const PBUF_RING = 0x80000000;
         const PBUF_SHIFT = 16;
         const MMAP_MASK = 0xF8000000;
+        const _ = !0;
     }
 }
 
@@ -103,11 +104,13 @@ bitflags! {
         const REGISTER_IOWQ_MAX_WORKERS =  19;
         const REGISTER_RING_FDS =  20;
         const UNREGISTER_RING_FDS =  21;
-        const REGISTER_PBUF_RING =  22;
-        const UNREGISTER_PBUF_RING =  23;
-        const REGISTER_SYNC_CANCEL =  24;
-        const REGISTER_FILE_ALLOC_RANGE =  25;
-        const REGISTER_LAST =  26;
+        const REGISTER_PBUF_RING =  22;  // 5.19
+        const UNREGISTER_PBUF_RING =  23;  // 5.19
+        const REGISTER_SYNC_CANCEL =  24;  // 6.0
+        const REGISTER_FILE_ALLOC_RANGE =  25;  // 6.0
+        const REGISTER_PBUF_STATUS = 26;  // 6.8
+        const REGISTER_LAST =  27;
         const REGISTER_USE_REGISTERED_RING =  2147483648;
+        const _ = !0;
     }
 }

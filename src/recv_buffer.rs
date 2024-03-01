@@ -3,12 +3,12 @@ use std::os::{
     fd::AsRawFd,
     raw::{c_uint, c_ulonglong, c_ushort},
 };
-use std::sync::atomic::AtomicU16;
+use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::Arc;
 
 #[repr(C)]
 #[derive(Default, Debug)]
-struct IoUringBuf {
+pub struct IoUringBuf {
     pub addr: c_ulonglong,
     pub len: c_uint,
     pub bid: c_ushort,
@@ -26,20 +26,25 @@ struct IoUringBufReg {
 }
 
 pub struct RecvBuffer {
-    pub ring_buffer: MmapBuffer,
+    pub index_mark: u16,
+    pub buffer_size: usize,
+    pub current_tail: AtomicU16,
+    pub kernel_tail: &'static mut AtomicU16,
     pub data_buffer: Vec<u8>,
+    pub ring_buffer: MmapBuffer,
+    pub ring_array: &'static mut [IoUringBuf],
 }
 
 impl RecvBuffer {
     pub fn new(ring_fd: &impl AsRawFd, config: &Config) -> std::io::Result<RecvBuffer> {
         // 1. prepare ring buffer.
         let bgid = 0;
-        let ring_buffer_sz = config.recv_buffer_count as usize * std::mem::size_of::<IoUringBuf>();
+        let ring_buffer_sz = config.recv_buffer_count * std::mem::size_of::<IoUringBuf>();
         let ring_buffer = MmapBuffer::anonymous(ring_buffer_sz)?;
 
         let mut reg = IoUringBufReg {
             ring_addr: ring_buffer.as_ptr() as _,
-            ring_entries: config.recv_buffer_count,
+            ring_entries: config.recv_buffer_count as _,
             bgid,
             ..Default::default()
         };
@@ -53,17 +58,18 @@ impl RecvBuffer {
         )?;
 
         // 3. prepare data buffer.
-        let sz = config.recv_buffer_size as usize * config.recv_buffer_count as usize;
-        let layout = std::alloc::Layout::from_size_align(sz, 4096).unwrap();
-        let mut data_buffer =
-            unsafe { Vec::<u8>::from_raw_parts(std::alloc::alloc(layout), sz, sz) };
+        let data_buffer_sz = config.recv_buffer_size * config.recv_buffer_count;
+        let layout = std::alloc::Layout::from_size_align(data_buffer_sz, 4096).unwrap();
+        let mut data_buffer = unsafe {
+            Vec::<u8>::from_raw_parts(std::alloc::alloc(layout), data_buffer_sz, data_buffer_sz)
+        };
 
+        // 4. register data buffer.
         let mut iovec = libc::iovec {
             iov_base: data_buffer.as_mut_ptr() as _,
             iov_len: data_buffer.len(),
         };
 
-        // 4. register data buffer.
         syscall::io_uring_register(
             ring_fd,
             constants::RegisterCode::REGISTER_BUFFERS.bits(),
@@ -71,20 +77,50 @@ impl RecvBuffer {
             1,
         )?;
 
+        // 5. fill ring buffer.
+        let ring_array: &'static mut [IoUringBuf] =
+            ring_buffer.offset_as_mut_slice(0, config.recv_buffer_count as _);
+        for (index, buf) in ring_array.iter_mut().enumerate() {
+            buf.addr = (&mut data_buffer[config.recv_buffer_size * index]) as *mut _ as _;
+            buf.len = config.recv_buffer_size as _;
+            buf.bid = 1u16 + index as u16;
+        }
+
+        let kernel_tail = ring_buffer.offset_as_mut::<AtomicU16>(24);
+        kernel_tail.store(config.recv_buffer_size as u16, Ordering::Release);
+
         Ok(RecvBuffer {
-            ring_buffer,
+            index_mark: (config.recv_buffer_count.next_power_of_two() - 1) as _,
+            buffer_size: config.recv_buffer_size,
+            current_tail: AtomicU16::new(config.recv_buffer_size as _),
+            kernel_tail,
             data_buffer,
+            ring_buffer,
+            ring_array,
         })
     }
 
-    pub fn recycle(&self, _bid: u16) {
-        // let tail = self.bufs[0].tail.load(Ordering::Relaxed);
-        // let addr = self.addr(bid);
-        // let buf = &mut self.bufs[(tail as u32 & (self.entries - 1)) as usize];
-        // buf.addr = addr;
-        // buf.len = self.size as _;
-        // buf.bid = bid;
-        // self.bufs[0].tail.fetch_add(1, Ordering::Relaxed);
+    fn addr(&self, bid: u16) -> *const u8 {
+        self.data_buffer
+            .as_ptr()
+            .wrapping_byte_add((bid - 1) as usize * self.buffer_size)
+    }
+
+    fn recycle(&self, bid: u16) {
+        let tail = self.current_tail.fetch_add(1, Ordering::AcqRel);
+
+        let offset = (tail & self.index_mark) as usize * std::mem::size_of::<IoUringBuf>();
+        let buf: &mut IoUringBuf = self.ring_buffer.offset_as_mut(offset);
+        buf.addr = self.addr(bid) as _;
+        buf.len = self.buffer_size as _;
+        buf.bid = bid;
+
+        let backoff = crate::backoff::Backoff::new();
+        while self.kernel_tail.load(Ordering::Acquire) != tail {
+            backoff.spin_light();
+        }
+        self.kernel_tail
+            .store(tail.wrapping_add(1), Ordering::Release);
     }
 }
 

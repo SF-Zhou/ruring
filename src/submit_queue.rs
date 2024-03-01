@@ -1,9 +1,12 @@
-use crate::{constants, flags, CompleteQueueEntry, IoUringParams, MmapBuffer, SubmitQueueEntry};
-use std::os::fd::AsRawFd;
+use crate::{
+    constants, flags, syscall, CompleteQueueEntry, IoUringParams, MmapBuffer, SubmitQueueEntry,
+};
+use std::os::fd::OwnedFd;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 pub struct SubmitQueue {
+    pub ring_fd: Arc<OwnedFd>,
     pub khead: &'static mut AtomicU32,
     pub ktail: &'static mut AtomicU32,
     pub kflags: &'static mut atomic::Atomic<flags::SQFlags>,
@@ -19,14 +22,8 @@ pub struct SubmitQueue {
     pub sqes_buffer: MmapBuffer,
 }
 
-impl ::std::fmt::Debug for SubmitQueue {
-    fn fmt(&self, fmt: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
-        fmt.write_str("SubmitQueue")
-    }
-}
-
 impl SubmitQueue {
-    pub fn new(fd: &impl AsRawFd, p: &IoUringParams) -> std::io::Result<Self> {
+    pub fn new(ring_fd: Arc<OwnedFd>, p: &IoUringParams) -> std::io::Result<Self> {
         if p.flags.contains(flags::SetupFlags::SQE128) {
             unimplemented!("IORING_SETUP_SQE128");
         }
@@ -41,7 +38,8 @@ impl SubmitQueue {
             }
         }
 
-        let sq_ring = MmapBuffer::file_mapping(fd, constants::Offset::SQ_RING.bits(), sq_ring_sz)?;
+        let sq_ring =
+            MmapBuffer::file_mapping(&ring_fd, constants::Offset::SQ_RING.bits(), sq_ring_sz)?;
         let ring_mask = *sq_ring.offset_as_mut(p.sq_off.ring_mask as usize);
         let ring_entries = *sq_ring.offset_as_mut(p.sq_off.ring_entries as usize);
         let array: &mut [AtomicU32] =
@@ -51,9 +49,11 @@ impl SubmitQueue {
         }
 
         let sqes_size = p.sq_entries as usize * std::mem::size_of::<SubmitQueueEntry>();
-        let sqes_buffer = MmapBuffer::file_mapping(fd, constants::Offset::SQES.bits(), sqes_size)?;
+        let sqes_buffer =
+            MmapBuffer::file_mapping(&ring_fd, constants::Offset::SQES.bits(), sqes_size)?;
 
         Ok(Self {
+            ring_fd,
             khead: sq_ring.offset_as_mut(p.sq_off.head as usize),
             ktail: sq_ring.offset_as_mut(p.sq_off.tail as usize),
             kflags: sq_ring.offset_as_mut(p.sq_off.flags as usize),
@@ -91,7 +91,7 @@ impl SubmitQueue {
         }
     }
 
-    pub fn flush(&mut self) -> u32 {
+    pub fn flush(&mut self) -> std::io::Result<u32> {
         let tail = self.sqe_tail;
 
         if self.sqe_head != tail {
@@ -104,30 +104,18 @@ impl SubmitQueue {
             }
         }
 
-        tail - self.khead.load(Ordering::Relaxed)
-    }
+        let submit = tail - self.khead.load(Ordering::Relaxed);
 
-    #[inline]
-    pub fn needs_enter(&self, submitted: u32, flags: &mut flags::EnterFlags) -> bool {
-        if submitted == 0 {
-            return false;
+        if submit > 0 {
+            syscall::io_uring_enter(
+                &self.ring_fd,
+                submit,
+                0,
+                flags::EnterFlags::default(),
+                std::ptr::null_mut(),
+            )?;
         }
 
-        if !self.flags.contains(flags::SetupFlags::SQPOLL) {
-            return true;
-        }
-
-        std::sync::atomic::fence(Ordering::SeqCst);
-
-        if self
-            .kflags
-            .load(Ordering::Relaxed)
-            .contains(flags::SQFlags::NEED_WAKEUP)
-        {
-            flags.insert(flags::EnterFlags::SQ_WAKEUP);
-            true
-        } else {
-            false
-        }
+        Ok(submit)
     }
 }
